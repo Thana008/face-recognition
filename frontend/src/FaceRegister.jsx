@@ -2,10 +2,15 @@ import React, { useRef, useEffect, useState } from 'react';
 import Webcam from 'react-webcam';
 import * as faceapi from 'face-api.js';
 import axios from 'axios';
+import Swal from 'sweetalert2';
+import 'sweetalert2/dist/sweetalert2.min.css';
 
-export default function FaceRegister() {
+export default function FaceRegisterForm() {
   const webcamRef = useRef(null);
+
   const [modelsLoaded, setModelsLoaded] = useState(false);
+  const [form, setForm] = useState({ firstName: '', lastName: '', email: '' });
+  const [loading, setLoading] = useState(false);
 
   useEffect(() => {
     const loadModels = async () => {
@@ -18,52 +23,108 @@ export default function FaceRegister() {
     loadModels();
   }, []);
 
-  const captureAndRegister = async () => {
+  const handleChange = (e) => {
+    setForm({ ...form, [e.target.name]: e.target.value });
+  };
+
+  const registerUser = async () => {
     if (!modelsLoaded) {
-      alert('Loading models...');
-      return;
+      return Swal.fire('รอโหลดโมเดลให้เสร็จก่อน', '', 'warning');
     }
 
-    const video = webcamRef.current.video;
-    const result = await faceapi
-      .detectSingleFace(video, new faceapi.TinyFaceDetectorOptions())
-      .withFaceLandmarks()
-      .withFaceDescriptor();
-
-    if (!result) {
-      alert('No face detected!');
-      return;
+    if (!form.firstName.trim() || !form.lastName.trim() || !form.email.trim()) {
+      return Swal.fire('กรุณากรอกข้อมูลให้ครบทุกช่อง', '', 'warning');
     }
 
-    const descriptor = result.descriptor; // 128-dimension Float32Array
-    const buffer = new Uint8Array(descriptor.buffer);
-    const base64Embedding = btoa(String.fromCharCode(...buffer));
+    setLoading(true);
 
     try {
-      const res = await axios.post('http://localhost:3001/register', {
-        name: 'John Doe',
-        email: 'john@example.com',
+      const video = webcamRef.current.video;
+      const detection = await faceapi
+        .detectSingleFace(video, new faceapi.TinyFaceDetectorOptions())
+        .withFaceLandmarks()
+        .withFaceDescriptor();
+
+      if (!detection) {
+        setLoading(false);
+        return Swal.fire('ไม่พบใบหน้าในกล้อง กรุณาลองใหม่อีกครั้ง', '', 'error');
+      }
+
+      const descriptor = detection.descriptor;
+      const buffer = new Uint8Array(descriptor.buffer);
+      const base64Embedding = btoa(String.fromCharCode(...buffer));
+
+      const fullName = `${form.firstName.trim()} ${form.lastName.trim()}`;
+
+      await axios.post('http://localhost:3001/register', {
+        name: fullName,
+        email: form.email.trim(),
         face_embedding: base64Embedding,
       });
-      alert(' ลงทะเบียนสำเร็จแล้วค่ะ!\n' + JSON.stringify(res.data.guest));
-    } catch (err) {
-      console.error(err);
-      alert(' ลงทะเบียนล้มเหลว');
+
+      setLoading(false);
+      Swal.fire({
+        icon: 'success',
+        title: 'ลงทะเบียนสำเร็จ',
+        width: 600,
+      });
+
+      // ล้างฟอร์มหลังลงทะเบียนเสร็จ
+      setForm({ firstName: '', lastName: '', email: '' });
+    } catch (error) {
+      setLoading(false);
+      Swal.fire('ลงทะเบียนล้มเหลว', error.message || 'เกิดข้อผิดพลาด', 'error');
     }
   };
 
   return (
-    <div>
-      <h2>🎥 Face Registration</h2>
+    <div className="container mt-4" style={{ maxWidth: 450 }}>
+      <h2 className="mb-4">ลงทะเบียนใบหน้า</h2>
+
+      <input
+        type="text"
+        name="firstName"
+        placeholder="ชื่อ"
+        value={form.firstName}
+        onChange={handleChange}
+        disabled={loading}
+        className="form-control mb-2"
+      />
+      <input
+        type="text"
+        name="lastName"
+        placeholder="นามสกุล"
+        value={form.lastName}
+        onChange={handleChange}
+        disabled={loading}
+        className="form-control mb-2"
+      />
+      <input
+        type="email"
+        name="email"
+        placeholder="อีเมล"
+        value={form.email}
+        onChange={handleChange}
+        disabled={loading}
+        className="form-control mb-3"
+      />
+
       <Webcam
+        audio={false}
         ref={webcamRef}
-        width={400}
-        height={300}
         screenshotFormat="image/jpeg"
         videoConstraints={{ facingMode: 'user' }}
+        className="mb-3 rounded border"
+        style={{ width: '100%' }}
       />
-      <br />
-      <button onClick={captureAndRegister}> จับใบหน้าและลงทะเบียน</button>
+
+      <button
+        onClick={registerUser}
+        disabled={loading}
+        className="btn btn-primary w-100"
+      >
+        {loading ? 'กำลังลงทะเบียน...' : 'จับใบหน้าและลงทะเบียน'}
+      </button>
     </div>
   );
 }
