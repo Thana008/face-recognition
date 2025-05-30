@@ -9,6 +9,9 @@ export default function FaceAttendance() {
   const [modelsLoaded, setModelsLoaded] = useState(false);
   const [loading, setLoading] = useState(false);
 
+  const [selectedDate, setSelectedDate] = useState(new Date().toISOString().slice(0, 10));
+  const [attendanceList, setAttendanceList] = useState([]);
+
   useEffect(() => {
     const loadModels = async () => {
       const MODEL_URL = process.env.PUBLIC_URL + '/models';
@@ -19,6 +22,62 @@ export default function FaceAttendance() {
     };
     loadModels();
   }, []);
+
+  useEffect(() => {
+    fetchAttendance(selectedDate);
+  }, [selectedDate]);
+
+  const fetchAttendance = async (date) => {
+    try {
+      const response = await axios.get('http://localhost:3001/attendance/list', { params: { date } });
+      setAttendanceList(response.data);
+    } catch (error) {
+      console.error(error);
+      Swal.fire('ไม่สามารถโหลดข้อมูลได้', error.message, 'error');
+    }
+  };
+
+  const getStatus = (checkIn, checkOut) => {
+    if (checkIn) {
+      const checkInTime = new Date(checkIn);
+      const dateString = checkInTime.toDateString();
+      if (checkInTime >= new Date(dateString + ' 08:30:00') && checkInTime <= new Date(dateString + ' 16:30:00')) {
+        return 'สาย';
+      } else if (checkInTime >= new Date(dateString + ' 07:00:00') && checkInTime < new Date(dateString + ' 08:30:00')) {
+        return 'ตรงเวลา';
+      }
+    }
+    if (checkOut) {
+      const checkOutTime = new Date(checkOut);
+      const dateString = checkOutTime.toDateString();
+      if (checkOutTime > new Date(dateString + ' 18:30:00')) {
+        return 'OT';
+      } else if (checkOutTime >= new Date(dateString + ' 17:00:00')) {
+        return 'ออกงาน';
+      }
+    }
+    return '-';
+  };
+
+  // ฟังก์ชันจับใบหน้าอัตโนมัติ (รอ 3 วินาที ถ้าเจอใบหน้า ก็สแกนและลงเวลา)
+  useEffect(() => {
+    if (!modelsLoaded || loading) return;
+    const interval = setInterval(async () => {
+      if (!webcamRef.current || !webcamRef.current.video) return;
+
+      const detection = await faceapi
+        .detectSingleFace(webcamRef.current.video, new faceapi.TinyFaceDetectorOptions())
+        .withFaceLandmarks()
+        .withFaceDescriptor();
+
+      if (detection) {
+        clearInterval(interval);
+        handleCheckAttendance();
+      }
+    }, 3000);
+
+    return () => clearInterval(interval);
+  }, [modelsLoaded, loading]);
 
   const handleCheckAttendance = async () => {
     if (!modelsLoaded) return Swal.fire('กำลังโหลดโมเดล...', '', 'info');
@@ -66,6 +125,9 @@ export default function FaceAttendance() {
           `,
         });
       }
+
+      fetchAttendance(selectedDate);
+
     } catch (error) {
       setLoading(false);
       Swal.fire('เกิดข้อผิดพลาด', error.response?.data?.message || error.message, 'error');
@@ -73,8 +135,20 @@ export default function FaceAttendance() {
   };
 
   return (
-    <div className="container mt-4" style={{ maxWidth: 450 }}>
+    <div className="container mt-4" style={{ maxWidth: 600 }}>
       <h2>ลงเวลาทำงานด้วยใบหน้า</h2>
+
+      <div className="mb-3">
+        <label htmlFor="dateFilter">เลือกวันที่: </label>
+        <input
+          id="dateFilter"
+          type="date"
+          className="form-control mb-3"
+          value={selectedDate}
+          onChange={(e) => setSelectedDate(e.target.value)}
+        />
+      </div>
+
       <Webcam
         audio={false}
         ref={webcamRef}
@@ -84,12 +158,34 @@ export default function FaceAttendance() {
         style={{ width: '100%' }}
       />
       <button
-        className="btn btn-primary w-100"
+        className="btn btn-primary w-100 mb-4"
         onClick={handleCheckAttendance}
         disabled={loading}
       >
         {loading ? 'กำลังประมวลผล...' : 'สแกนใบหน้าและลงเวลา'}
       </button>
+
+      {/* ตารางลงเวลาทำงาน */}
+      <table className="table table-bordered table-striped">
+        <thead>
+          <tr>
+            <th>ชื่อ</th>
+            <th>เช็คอิน</th>
+            <th>เช็คเอาท์</th>
+            <th>สถานะ</th>
+          </tr>
+        </thead>
+        <tbody>
+          {attendanceList.map((item) => (
+            <tr key={item.id}>
+              <td>{item.guest_name}</td>
+              <td>{item.check_in ? new Date(item.check_in).toLocaleString() : '-'}</td>
+              <td>{item.check_out ? new Date(item.check_out).toLocaleString() : '-'}</td>
+              <td>{getStatus(item.check_in, item.check_out)}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
     </div>
   );
 }

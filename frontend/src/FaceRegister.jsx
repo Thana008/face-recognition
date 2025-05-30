@@ -7,7 +7,6 @@ import 'sweetalert2/dist/sweetalert2.min.css';
 
 export default function FaceRegisterForm() {
   const webcamRef = useRef(null);
-
   const [modelsLoaded, setModelsLoaded] = useState(false);
   const [form, setForm] = useState({ firstName: '', lastName: '', email: '' });
   const [loading, setLoading] = useState(false);
@@ -26,6 +25,28 @@ export default function FaceRegisterForm() {
   const handleChange = (e) => {
     setForm({ ...form, [e.target.name]: e.target.value });
   };
+
+  // จับใบหน้าอัตโนมัติทุก 3 วิ เมื่อกรอกฟอร์มครบ
+  useEffect(() => {
+    if (!modelsLoaded || loading) return;
+
+    const interval = setInterval(async () => {
+      if (!webcamRef.current || !webcamRef.current.video) return;
+      if (!form.firstName.trim() || !form.lastName.trim() || !form.email.trim()) return;
+
+      const detection = await faceapi
+        .detectSingleFace(webcamRef.current.video, new faceapi.TinyFaceDetectorOptions())
+        .withFaceLandmarks()
+        .withFaceDescriptor();
+
+      if (detection) {
+        clearInterval(interval);
+        await registerUser();
+      }
+    }, 3000);
+
+    return () => clearInterval(interval);
+  }, [modelsLoaded, loading, form]);
 
   const registerUser = async () => {
     if (!modelsLoaded) {
@@ -69,7 +90,6 @@ export default function FaceRegisterForm() {
         width: 600,
       });
 
-      // ล้างฟอร์มหลังลงทะเบียนเสร็จ
       setForm({ firstName: '', lastName: '', email: '' });
     } catch (error) {
       setLoading(false);

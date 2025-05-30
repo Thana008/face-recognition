@@ -137,18 +137,60 @@ app.post('/attendance', async (req, res) => {
 
 app.get('/attendance/all', async (req, res) => {
   try {
-    const result = await pool.query(`
-      SELECT a.id, g.name as guest_name, a.check_in, a.check_out,
-        CASE
-          WHEN a.check_in > (a.attendance_date::text || ' 08:30:00')::timestamp THEN true
-          ELSE false
-        END as isLate
+    const query = `
+      SELECT a.*, g.name AS guest_name
       FROM attendance a
-      JOIN guest g ON a.guest_id = g.id
-      ORDER BY a.attendance_date DESC, a.check_in DESC
-    `);
+      LEFT JOIN guest g ON a.guest_id = g.id
+      ORDER BY a.id ASC
+    `;
+    const result = await pool.query(query);
     res.json(result.rows);
   } catch (error) {
+    console.error(error);
+    res.status(500).json({ message: error.message });
+  }
+});
+
+app.get('/attendance/list', async (req, res) => {
+  try {
+    const { date } = req.query;
+    const query = `
+      SELECT a.*, g.name AS guest_name
+      FROM attendance a
+      JOIN guest g ON a.guest_id = g.id
+      WHERE attendance_date = $1
+      ORDER BY check_in ASC
+    `;
+    const result = await pool.query(query, [date]);
+    res.json(result.rows);
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ message: error.message });
+  }
+});
+
+// ดึงจำนวนพนักงานทั้งหมด
+app.get('/guest/count', async (req, res) => {
+  try {
+    const result = await pool.query('SELECT COUNT(*) FROM guest');
+    res.json({ count: parseInt(result.rows[0].count) });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ message: error.message });
+  }
+});
+
+// ดึงจำนวนพนักงานที่เช็คอินในวันนั้น
+app.get('/attendance/count', async (req, res) => {
+  try {
+    const { date } = req.query;
+    const result = await pool.query(
+      `SELECT COUNT(DISTINCT guest_id) FROM attendance WHERE attendance_date = $1 AND check_in IS NOT NULL`,
+      [date]
+    );
+    res.json({ count: parseInt(result.rows[0].count) });
+  } catch (error) {
+    console.error(error);
     res.status(500).json({ message: error.message });
   }
 });
