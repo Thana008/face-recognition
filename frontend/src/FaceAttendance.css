@@ -1,0 +1,115 @@
+
+@import url('https://fonts.googleapis.com/css2?family=Raleway:wght@200&display=swap');
+
+.custom-attendance {
+  min-height: 100vh;
+  flex-direction: column;
+  background: linear-gradient(135deg, #1a1a1a 0%, #333333 100%);
+  padding: 2rem 0;
+}
+
+.custom-attendance h2 {
+  font-family: 'Raleway', sans-serif;
+  font-size: 4rem;
+  font-weight: 200;
+  color: #ffffff;
+  margin-bottom: 2rem;
+  text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.3);
+  letter-spacing: 2px;
+}
+
+.custom-attendance .mb-3 {
+  width: 100%;
+  max-width: 600px;
+}
+
+.custom-attendance label {
+  font-family: 'Raleway', sans-serif;
+  font-weight: 200;
+  color: #ffffff;
+  font-size: 1.2rem;
+  letter-spacing: 1px;
+}
+
+.custom-attendance input {
+  background-color: rgba(255, 255, 255, 0.1);
+  border: 1px solid #ffffff;
+  border-radius: 0;
+  color: #ffffff;
+  font-family: 'Raleway', sans-serif;
+  font-weight: 200;
+  font-size: 1.1rem;
+  padding: 10px;
+  margin-bottom: 1rem;
+  width: 100%;
+  transition: all 0.3s ease;
+}
+
+.custom-attendance input::placeholder {
+  color: #cccccc;
+}
+
+.custom-attendance input:focus {
+  outline: none;
+  border-color: #aaaaaa;
+  background-color: rgba(255, 255, 255, 0.2);
+}
+
+.custom-attendance .webcam {
+  border: 1px solid #ffffff;
+  border-radius: 0;
+  margin-bottom: 1.5rem;
+  width: 100%;
+  max-width: 600px;
+}
+
+.custom-attendance .btn {
+  background-color: #000000;
+  color: #ffffff;
+  border: none;
+  border-radius: 0;
+  padding: 15px 30px;
+  font-size: 1.2rem;
+  font-family: 'Raleway', sans-serif;
+  font-weight: 200;
+  transition: all 0.3s ease;
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.3);
+  width: 100%;
+  max-width: 600px;
+  letter-spacing: 1px;
+  margin-bottom: 2rem;
+}
+
+.custom-attendance .btn:hover {
+  background-color: #444;
+  transform: translateY(-2px);
+  box-shadow: 0 6px 10px rgba(0, 0, 0, 0.5);
+}
+
+.custom-attendance .btn:disabled {
+  background-color: #333;
+  cursor: not-allowed;
+}
+
+.custom-attendance .table {
+  width: 100%;
+  max-width: 600px;
+  color: #ffffff;
+  font-family: 'Raleway', sans-serif;
+  font-weight: 200;
+  border-collapse: collapse;
+}
+
+.custom-attendance .table th,
+.custom-attendance .table td {
+  border: 1px solid #ffffff;
+  padding: 10px;
+  text-align: center;
+  background-color: rgba(255, 255, 255, 0.1);
+}
+
+.custom-attendance .table th {
+  background-color: rgba(255, 255, 255, 0.2);
+  font-weight: 200;
+  letter-spacing: 1px;
+}

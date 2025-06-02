@@ -4,6 +4,8 @@ import * as faceapi from 'face-api.js';
 import axios from 'axios';
 import Swal from 'sweetalert2';
 
+import './FaceAttendance.css';  // import ไฟล์ CSS
+
 export default function FaceAttendance() {
   const webcamRef = useRef(null);
   const [modelsLoaded, setModelsLoaded] = useState(false);
@@ -59,7 +61,6 @@ export default function FaceAttendance() {
     return '-';
   };
 
-  // ฟังก์ชันจับใบหน้าอัตโนมัติ (รอ 3 วินาที ถ้าเจอใบหน้า ก็สแกนและลงเวลา)
   useEffect(() => {
     if (!modelsLoaded || loading) return;
     const interval = setInterval(async () => {
@@ -135,9 +136,8 @@ export default function FaceAttendance() {
   };
 
   return (
-    <div className="container mt-4" style={{ maxWidth: 600 }}>
+    <div className="d-flex justify-content-center align-items-center custom-attendance">
       <h2>ลงเวลาทำงานด้วยใบหน้า</h2>
-
       <div className="mb-3">
         <label htmlFor="dateFilter">เลือกวันที่: </label>
         <input
@@ -148,24 +148,21 @@ export default function FaceAttendance() {
           onChange={(e) => setSelectedDate(e.target.value)}
         />
       </div>
-
       <Webcam
         audio={false}
         ref={webcamRef}
         screenshotFormat="image/jpeg"
         videoConstraints={{ facingMode: 'user' }}
-        className="mb-3 rounded border"
+        className="webcam mb-3 rounded border"
         style={{ width: '100%' }}
       />
       <button
-        className="btn btn-primary w-100 mb-4"
+        className="btn w-100 mb-4"
         onClick={handleCheckAttendance}
         disabled={loading}
       >
         {loading ? 'กำลังประมวลผล...' : 'สแกนใบหน้าและลงเวลา'}
       </button>
-
-      {/* ตารางลงเวลาทำงาน */}
       <table className="table table-bordered table-striped">
         <thead>
           <tr>

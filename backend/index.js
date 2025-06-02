@@ -2,6 +2,7 @@ const express = require('express');
 const cors = require('cors');
 const bodyParser = require('body-parser');
 const { Pool } = require('pg');
+const { parseISO, startOfWeek, startOfMonth, startOfYear, endOfDay } = require('date-fns');
 
 const app = express();
 const port = 3001;
@@ -188,6 +189,126 @@ app.get('/attendance/count', async (req, res) => {
       `SELECT COUNT(DISTINCT guest_id) FROM attendance WHERE attendance_date = $1 AND check_in IS NOT NULL`,
       [date]
     );
+    res.json({ count: parseInt(result.rows[0].count) });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ message: error.message });
+  }
+});
+
+app.get('/attendance/summary', async (req, res) => {
+  try {
+    const { range } = req.query;
+    let query = `
+      SELECT a.*, g.name AS guest_name
+      FROM attendance a
+      LEFT JOIN guest g ON a.guest_id = g.id
+    `;
+
+    const now = new Date();
+    let startDate;
+
+    if (range === 'week') {
+      const day = now.getDay(); // Sunday = 0
+      startDate = new Date(now);
+      startDate.setDate(now.getDate() - day);
+    } else if (range === 'month') {
+      startDate = new Date(now.getFullYear(), now.getMonth(), 1);
+    } else if (range === 'year') {
+      startDate = new Date(now.getFullYear(), 0, 1);
+    } else {
+      // Default = day
+      startDate = new Date(now.toISOString().slice(0, 10)); // only yyyy-mm-dd
+    }
+
+    query += ` WHERE attendance_date >= $1 ORDER BY check_in ASC`;
+    const result = await pool.query(query, [startDate.toISOString().slice(0, 10)]);
+    res.json(result.rows);
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ message: error.message });
+  }
+});
+
+app.get('/attendance/filter', async (req, res) => {
+  try {
+    const { type, date } = req.query;
+    const parsedDate = parseISO(date);
+
+    let start, end;
+
+    if (type === 'day') {
+      start = parsedDate;
+      end = endOfDay(parsedDate);
+    } else if (type === 'week') {
+      start = startOfWeek(parsedDate, { weekStartsOn: 1 }); // เริ่มวันจันทร์
+      end = new Date(start);
+      end.setDate(start.getDate() + 6);
+    } else if (type === 'month') {
+      start = startOfMonth(parsedDate);
+      end = new Date(start);
+      end.setMonth(start.getMonth() + 1);
+      end.setDate(end.getDate() - 1);
+    } else if (type === 'year') {
+      start = startOfYear(parsedDate);
+      end = new Date(start);
+      end.setFullYear(start.getFullYear() + 1);
+      end.setDate(end.getDate() - 1);
+    } else {
+      return res.status(400).json({ message: 'Invalid type. ใช้ day, week, month, year เท่านั้น' });
+    }
+
+    const result = await pool.query(
+      `SELECT a.*, g.name AS guest_name
+       FROM attendance a
+       JOIN guest g ON a.guest_id = g.id
+       WHERE attendance_date BETWEEN $1 AND $2
+       ORDER BY check_in ASC`,
+      [start.toISOString().slice(0, 10), end.toISOString().slice(0, 10)]
+    );
+
+    res.json(result.rows);
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ message: error.message });
+  }
+});
+
+app.get('/attendance/count/filter', async (req, res) => {
+  try {
+    const { type, date } = req.query;
+    const parsedDate = parseISO(date);
+
+    let start, end;
+
+    if (type === 'day') {
+      start = parsedDate;
+      end = endOfDay(parsedDate);
+    } else if (type === 'week') {
+      start = startOfWeek(parsedDate, { weekStartsOn: 1 });
+      end = new Date(start);
+      end.setDate(start.getDate() + 6);
+    } else if (type === 'month') {
+      start = startOfMonth(parsedDate);
+      end = new Date(start);
+      end.setMonth(start.getMonth() + 1);
+      end.setDate(end.getDate() - 1);
+    } else if (type === 'year') {
+      start = startOfYear(parsedDate);
+      end = new Date(start);
+      end.setFullYear(start.getFullYear() + 1);
+      end.setDate(end.getDate() - 1);
+    } else {
+      return res.status(400).json({ message: 'Invalid type. ใช้ day, week, month, year เท่านั้น' });
+    }
+
+    const result = await pool.query(
+      `SELECT COUNT(DISTINCT guest_id) 
+       FROM attendance 
+       WHERE attendance_date BETWEEN $1 AND $2 AND check_in IS NOT NULL`,
+      [start.toISOString().slice(0, 10), end.toISOString().slice(0, 10)]
+    );
+
     res.json({ count: parseInt(result.rows[0].count) });
   } catch (error) {
     console.error(error);

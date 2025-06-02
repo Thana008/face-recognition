@@ -5,6 +5,8 @@ import axios from 'axios';
 import Swal from 'sweetalert2';
 import 'sweetalert2/dist/sweetalert2.min.css';
 
+import './FaceRegister.css'; // import ไฟล์ CSS
+
 export default function FaceRegisterForm() {
   const webcamRef = useRef(null);
   const [modelsLoaded, setModelsLoaded] = useState(false);
@@ -26,7 +28,6 @@ export default function FaceRegisterForm() {
     setForm({ ...form, [e.target.name]: e.target.value });
   };
 
-  // จับใบหน้าอัตโนมัติทุก 3 วิ เมื่อกรอกฟอร์มครบ
   useEffect(() => {
     if (!modelsLoaded || loading) return;
 
@@ -98,9 +99,8 @@ export default function FaceRegisterForm() {
   };
 
   return (
-    <div className="container mt-4" style={{ maxWidth: 450 }}>
+    <div className="d-flex justify-content-center align-items-center custom-register">
       <h2 className="mb-4">ลงทะเบียนใบหน้า</h2>
-
       <input
         type="text"
         name="firstName"
@@ -128,16 +128,14 @@ export default function FaceRegisterForm() {
         disabled={loading}
         className="form-control mb-3"
       />
-
       <Webcam
         audio={false}
         ref={webcamRef}
         screenshotFormat="image/jpeg"
         videoConstraints={{ facingMode: 'user' }}
-        className="mb-3 rounded border"
+        className="webcam mb-3 rounded border"
         style={{ width: '100%' }}
       />
-
       <button
         onClick={registerUser}
         disabled={loading}

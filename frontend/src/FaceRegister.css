@@ -1,0 +1,68 @@
+
+.custom-register {
+  height: 100vh;
+  flex-direction: column;
+  background: linear-gradient(135deg, rgb(68, 68, 68) 0%, rgb(7, 7, 7) 100%);
+}
+.custom-register h2 {
+  font-family: 'Raleway', sans-serif;
+  font-size: 4rem;
+  font-weight: 200;
+  color: #ffffff;
+  margin-bottom: 2rem;
+  text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.3);
+  letter-spacing: 2px;
+}
+.custom-register input {
+  background-color: rgba(255, 255, 255, 0.1);
+  border: 1px solid #ffffff;
+  border-radius: 0;
+  color: #ffffff;
+  font-family: 'Raleway', sans-serif;
+  font-weight: 200;
+  font-size: 1.1rem;
+  padding: 10px;
+  margin-bottom: 1rem;
+  width: 100%;
+  max-width: 450px;
+  transition: all 0.3s ease;
+}
+.custom-register input::placeholder {
+  color: #cccccc;
+}
+.custom-register input:focus {
+  outline: none;
+  border-color: #aaaaaa;
+  background-color: rgba(255, 255, 255, 0.2);
+}
+.custom-register .webcam {
+  border: 1px solid #ffffff;
+  border-radius: 0;
+  margin-bottom: 1.5rem;
+  width: 100%;
+  max-width: 450px;
+}
+.custom-register .btn {
+  background-color: #000000;
+  color: #ffffff;
+  border: none;
+  border-radius: 0;
+  padding: 15px 30px;
+  font-size: 1.2rem;
+  font-family: 'Raleway', sans-serif;
+  font-weight: 200;
+  transition: all 0.3s ease;
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.3);
+  width: 100%;
+  max-width: 450px;
+  letter-spacing: 1px;
+}
+.custom-register .btn:hover {
+  background-color: #444;
+  transform: translateY(-2px);
+  box-shadow: 0 6px 10px rgba(0, 0, 0, 0.5);
+}
+.custom-register .btn:disabled {
+  background-color: #333;
+  cursor: not-allowed;
+}
