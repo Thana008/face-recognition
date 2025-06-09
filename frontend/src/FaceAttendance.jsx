@@ -4,7 +4,7 @@ import * as faceapi from 'face-api.js';
 import axios from 'axios';
 import Swal from 'sweetalert2';
 
-import './FaceAttendance.css';  // import ไฟล์ CSS
+import './FaceAttendance.css';
 
 export default function FaceAttendance() {
   const webcamRef = useRef(null);
@@ -128,7 +128,6 @@ export default function FaceAttendance() {
       }
 
       fetchAttendance(selectedDate);
-
     } catch (error) {
       setLoading(false);
       Swal.fire('เกิดข้อผิดพลาด', error.response?.data?.message || error.message, 'error');

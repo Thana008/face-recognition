@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import axios from 'axios';
 import {
-  LineChart, Line, XAxis, YAxis, Tooltip, Legend, ResponsiveContainer,
+  LineChart, Line, XAxis, YAxis, Tooltip, Legend, ResponsiveContainer, BarChart, Bar
 } from 'recharts';
 
 export default function Dashboard() {
@@ -10,9 +10,11 @@ export default function Dashboard() {
   const [date, setDate] = useState(new Date().toISOString().slice(0, 10));
   const [totalEmployees, setTotalEmployees] = useState(0);
   const [checkedInEmployees, setCheckedInEmployees] = useState(0);
+  const [otData, setOtData] = useState([]); // สำหรับข้อมูล OT
 
   useEffect(() => {
     fetchDashboardData();
+    fetchOtData(); // ดึงข้อมูล OT
   }, [date, filterType]);
 
   const fetchDashboardData = async () => {
@@ -30,6 +32,15 @@ export default function Dashboard() {
       });
       setCheckedInEmployees(checkedInRes.data.count);
 
+    } catch (error) {
+      console.error(error);
+    }
+  };
+
+  const fetchOtData = async () => {
+    try {
+      const otRes = await axios.get('http://localhost:3001/attendance/ot');  // API สำหรับ OT
+      setOtData(otRes.data);
     } catch (error) {
       console.error(error);
     }
@@ -58,6 +69,11 @@ export default function Dashboard() {
       check_out_time: formatTimeAsDecimal(checkOut)
     };
   });
+
+  const otChartData = otData.map(ot => ({
+    date: ot.date, 
+    otCount: ot.otCount,  // จำนวน OT
+  }));
 
   return (
     <div className="container mt-4">
@@ -100,6 +116,16 @@ export default function Dashboard() {
           <Line type="monotone" dataKey="check_in_time" stroke="#8884d8" name="เวลาเข้า" strokeWidth={2} dot={false} />
           <Line type="monotone" dataKey="check_out_time" stroke="#82ca9d" name="เวลาออก" strokeWidth={2} dot={false} />
         </LineChart>
+      </ResponsiveContainer>
+
+      <h5 className="mt-4">กราฟ OT (Overtime) ของพนักงาน</h5>
+      <ResponsiveContainer width="100%" height={350}>
+        <BarChart data={otChartData}>
+          <XAxis dataKey="date" />
+          <YAxis />
+          <Tooltip />
+          <Bar dataKey="otCount" fill="#82ca9d" />
+        </BarChart>
       </ResponsiveContainer>
 
       <table className="table table-bordered mt-4">

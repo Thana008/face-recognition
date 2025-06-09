@@ -10,9 +10,12 @@ import './FaceRegister.css'; // import ไฟล์ CSS
 export default function FaceRegisterForm() {
   const webcamRef = useRef(null);
   const [modelsLoaded, setModelsLoaded] = useState(false);
-  const [form, setForm] = useState({ firstName: '', lastName: '', email: '' });
+  const [form, setForm] = useState({ firstName: '', lastName: '', email: '', verificationCode: '' });
   const [loading, setLoading] = useState(false);
+  const [emailVerified, setEmailVerified] = useState(false);
+  const [verificationCodeSent, setVerificationCodeSent] = useState(false);
 
+  // โหลดโมเดลจาก face-api.js
   useEffect(() => {
     const loadModels = async () => {
       const MODEL_URL = process.env.PUBLIC_URL + '/models';
@@ -24,12 +27,54 @@ export default function FaceRegisterForm() {
     loadModels();
   }, []);
 
+  // การจัดการข้อมูลในฟอร์ม
   const handleChange = (e) => {
     setForm({ ...form, [e.target.name]: e.target.value });
   };
 
+  // ฟังก์ชันการยืนยันอีเมล
+  const sendVerificationEmail = async () => {
+    if (!form.email.trim()) {
+      return Swal.fire('กรุณากรอกอีเมลให้ถูกต้อง', '', 'warning');
+    }
+
+    setLoading(true);
+
+    try {
+      // ส่งคำขอไปยัง Backend เพื่อส่งรหัสยืนยัน
+      await axios.post('http://localhost:3001/send-verification-email', {
+        email: form.email.trim(),
+      });
+
+      setLoading(false);
+      setVerificationCodeSent(true);
+      Swal.fire({
+        icon: 'success',
+        title: 'อีเมลยืนยันถูกส่ง',
+        text: 'กรุณาตรวจสอบอีเมลของคุณและกรอกรหัสยืนยัน',
+      });
+    } catch (error) {
+      setLoading(false);
+      Swal.fire('เกิดข้อผิดพลาด', error.message || 'ไม่สามารถส่งอีเมลได้', 'error');
+    }
+  };
+
+  // ฟังก์ชันการตรวจสอบรหัสยืนยัน
+  const verifyCode = () => {
+    if (form.verificationCode !== '123456') {
+      return Swal.fire('รหัสยืนยันไม่ถูกต้อง', '', 'error');
+    }
+    setEmailVerified(true);
+    Swal.fire({
+      icon: 'success',
+      title: 'ยืนยันอีเมลสำเร็จ',
+      text: 'สามารถเริ่มต้นการลงทะเบียนใบหน้าได้',
+    });
+  };
+
+  // การตรวจจับใบหน้าในกล้อง
   useEffect(() => {
-    if (!modelsLoaded || loading) return;
+    if (!modelsLoaded || loading || !emailVerified) return;
 
     const interval = setInterval(async () => {
       if (!webcamRef.current || !webcamRef.current.video) return;
@@ -47,8 +92,9 @@ export default function FaceRegisterForm() {
     }, 3000);
 
     return () => clearInterval(interval);
-  }, [modelsLoaded, loading, form]);
+  }, [modelsLoaded, loading, form, emailVerified]);
 
+  // ลงทะเบียนผู้ใช้งาน
   const registerUser = async () => {
     if (!modelsLoaded) {
       return Swal.fire('รอโหลดโมเดลให้เสร็จก่อน', '', 'warning');
@@ -78,6 +124,7 @@ export default function FaceRegisterForm() {
 
       const fullName = `${form.firstName.trim()} ${form.lastName.trim()}`;
 
+      // เรียก API ลงทะเบียน
       await axios.post('http://localhost:3001/register', {
         name: fullName,
         email: form.email.trim(),
@@ -85,13 +132,16 @@ export default function FaceRegisterForm() {
       });
 
       setLoading(false);
+
+      // หลังจากลงทะเบียนสำเร็จ ส่งอีเมลยืนยัน
       Swal.fire({
         icon: 'success',
         title: 'ลงทะเบียนสำเร็จ',
         width: 600,
+        text: 'ตรวจสอบอีเมลของคุณเพื่อยืนยันการลงทะเบียน',
       });
 
-      setForm({ firstName: '', lastName: '', email: '' });
+      setForm({ firstName: '', lastName: '', email: '', verificationCode: '' });
     } catch (error) {
       setLoading(false);
       Swal.fire('ลงทะเบียนล้มเหลว', error.message || 'เกิดข้อผิดพลาด', 'error');
@@ -107,7 +157,7 @@ export default function FaceRegisterForm() {
         placeholder="ชื่อ"
         value={form.firstName}
         onChange={handleChange}
-        disabled={loading}
+        disabled={loading || emailVerified}
         className="form-control mb-2"
       />
       <input
@@ -116,18 +166,47 @@ export default function FaceRegisterForm() {
         placeholder="นามสกุล"
         value={form.lastName}
         onChange={handleChange}
-        disabled={loading}
+        disabled={loading || emailVerified}
         className="form-control mb-2"
       />
-      <input
-        type="email"
-        name="email"
-        placeholder="อีเมล"
-        value={form.email}
-        onChange={handleChange}
-        disabled={loading}
-        className="form-control mb-3"
-      />
+      <div className="d-flex mb-3">
+        <input
+          type="email"
+          name="email"
+          placeholder="อีเมล"
+          value={form.email}
+          onChange={handleChange}
+          disabled={loading || emailVerified}
+          className="form-control"
+        />
+        <button
+          onClick={sendVerificationEmail}
+          disabled={loading || emailVerified}
+          className="btn btn-secondary ms-2"
+        >
+          ยืนยันอีเมล
+        </button>
+      </div>
+      {verificationCodeSent && !emailVerified && (
+        <div className="mb-3">
+          <input
+            type="text"
+            name="verificationCode"
+            placeholder="กรอกรหัสยืนยัน"
+            value={form.verificationCode}
+            onChange={handleChange}
+            disabled={loading || emailVerified}
+            className="form-control"
+          />
+          <button
+            onClick={verifyCode}
+            disabled={loading || emailVerified}
+            className="btn btn-primary mt-2"
+          >
+            ตรวจสอบรหัส
+          </button>
+        </div>
+      )}
       <Webcam
         audio={false}
         ref={webcamRef}
@@ -138,7 +217,7 @@ export default function FaceRegisterForm() {
       />
       <button
         onClick={registerUser}
-        disabled={loading}
+        disabled={loading || !emailVerified}
         className="btn btn-primary w-100"
       >
         {loading ? 'กำลังลงทะเบียน...' : 'จับใบหน้าและลงทะเบียน'}

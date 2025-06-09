@@ -3,6 +3,7 @@ const cors = require('cors');
 const bodyParser = require('body-parser');
 const { Pool } = require('pg');
 const { parseISO, startOfWeek, startOfMonth, startOfYear, endOfDay } = require('date-fns');
+const nodemailer = require('nodemailer');
 
 const app = express();
 const port = 3001;
@@ -18,7 +19,69 @@ const pool = new Pool({
   port: 5432,
 });
 
-// API ลงทะเบียนพนักงาน (เก็บ face_embedding)
+// Nodemailer setup for sending emails
+const transporter = nodemailer.createTransport({
+  service: 'gmail',
+  auth: {
+    user: 'thana.chaiy@ku.th',  // เปลี่ยนเป็นอีเมลที่คุณใช้
+    pass: 'uvyv ncpg tkdt ujxu',   // ใช้รหัสผ่านหรือรหัสแอปจาก Gmail
+  },
+});
+
+// Function to send verification email
+function sendVerificationEmail(userEmail, verificationCode) {
+  const mailOptions = {
+    from: 'thana.chaiy@ku.th',
+    to: userEmail,
+    subject: 'ยืนยันการสมัครสมาชิก',
+    text: `กรุณากรอกรหัสยืนยัน: ${verificationCode} เพื่อยืนยันการสมัครสมาชิกของคุณ`,
+  };
+
+  transporter.sendMail(mailOptions, (error, info) => {
+    if (error) {
+      console.log('Error sending verification email:', error);
+    } else {
+      console.log('Verification email sent:', info.response);
+    }
+  });
+}
+
+// Function to send attendance email (check-in/check-out)
+function sendAttendanceEmail(userEmail, status, timestamp, isLate) {
+  const mailOptions = {
+    from: 'thana.chaiy@ku.th',
+    to: userEmail,
+    subject: status === 'check-in' ? 'เช็คอินสำเร็จ' : 'เช็คเอาท์สำเร็จ',
+    text: `
+      คุณได้ทำการ ${status === 'check-in' ? 'เช็คอิน' : 'เช็คเอาท์'} เวลา: ${timestamp}
+      ${isLate ? '\nสถานะ: สาย' : '\nสถานะ: ตรงเวลา'}
+    `,
+  };
+
+  transporter.sendMail(mailOptions, (error, info) => {
+    if (error) {
+      console.log('Error sending attendance email:', error);
+    } else {
+      console.log('Attendance email sent:', info.response);
+    }
+  });
+}
+
+// Function to check the status based on check-in time
+function checkLateStatus(checkIn, checkOut) {
+  const checkInTime = new Date(checkIn);
+  const checkOutTime = new Date(checkOut);
+
+  // เช็คเวลาเข้า ว่าเกิน 10 โมงเช้าหรือไม่
+  const isLate = checkInTime.getHours() >= 10; // ถ้าเกิน 10 โมงเช้า ถือว่าสาย
+
+  // คำนวณ OT โดยการหักเวลาทำงานปกติ (เช่น 8 ชั่วโมง)
+  const workedHours = (checkOutTime - checkInTime) / (1000 * 60 * 60); // จำนวนชั่วโมงที่ทำงาน
+  const otHours = workedHours > 8 ? workedHours - 8 : 0; // ถ้าทำงานเกิน 8 ชั่วโมงให้ OT
+
+  return { isLate, otHours };
+}
+// API สำหรับการลงทะเบียนพนักงาน (เก็บ face_embedding)
 app.post('/register', async (req, res) => {
   try {
     const { name, email, face_embedding } = req.body;
@@ -27,34 +90,35 @@ app.post('/register', async (req, res) => {
       INSERT INTO guest (name, email, face_embedding) 
       VALUES ($1, $2, $3) RETURNING *`;
 
-    // สมมติ face_embedding เป็น base64 string แปลงเป็น Buffer ก่อนเก็บ
     const values = [name, email, Buffer.from(face_embedding, 'base64')];
 
     const result = await pool.query(query, values);
-    res.json({ status: 'success', guest: result.rows[0] });
+    const newGuest = result.rows[0];
+
+    // ส่งอีเมลยืนยันการสมัคร
+    const verificationCode = '123456';  // รหัสยืนยันที่คุณสร้างขึ้น
+    sendVerificationEmail(email, verificationCode);
+
+    res.json({ status: 'success', guest: newGuest });
   } catch (error) {
     console.error(error);
     res.status(500).json({ status: 'error', message: error.message });
   }
 });
 
-// backend/index.js (เพิ่มโค้ดนี้ต่อจากเดิม)
+// API สำหรับเช็คอิน/เช็คเอาท์
 app.post('/attendance', async (req, res) => {
   try {
     const { face_embedding } = req.body;
-
-    // แปลง base64 เป็น Buffer
     const inputEmbedding = Buffer.from(face_embedding, 'base64');
 
-    // ดึง guest ทั้งหมดจาก DB
     const guestsResult = await pool.query('SELECT * FROM guest');
     const guests = guestsResult.rows;
 
-    // หา guest ที่ face_embedding ใกล้เคียงที่สุด (เช็คด้วย Euclidean distance)
-    const threshold = 0.6; // ปรับได้
     let minDistance = Number.MAX_VALUE;
     let matchedGuest = null;
 
+    // ใช้ Euclidean distance ในการเปรียบเทียบใบหน้า
     const euclideanDistance = (vec1, vec2) => {
       let sum = 0;
       for (let i = 0; i < vec1.length; i++) {
@@ -64,7 +128,6 @@ app.post('/attendance', async (req, res) => {
       return Math.sqrt(sum);
     };
 
-    // แปลง face_embedding จาก Buffer เป็น Float32Array
     const bufferToFloat32Array = (buffer) => {
       return new Float32Array(buffer.buffer, buffer.byteOffset, buffer.byteLength / Float32Array.BYTES_PER_ELEMENT);
     };
@@ -74,7 +137,7 @@ app.post('/attendance', async (req, res) => {
     for (const guest of guests) {
       const guestArray = bufferToFloat32Array(guest.face_embedding);
       const dist = euclideanDistance(inputArray, guestArray);
-      if (dist < minDistance && dist < threshold) {
+      if (dist < minDistance && dist < 0.6) {
         minDistance = dist;
         matchedGuest = guest;
       }
@@ -84,7 +147,6 @@ app.post('/attendance', async (req, res) => {
       return res.status(404).json({ message: 'ไม่พบผู้ใช้ในระบบ' });
     }
 
-    // ตรวจสอบว่า guest คนนี้เคยเช็คอินวันนี้หรือยัง
     const today = new Date();
     const todayDateString = today.toISOString().slice(0, 10);
 
@@ -96,38 +158,40 @@ app.post('/attendance', async (req, res) => {
     let attendance = attendanceResult.rows[0];
 
     if (!attendance) {
-      // ยังไม่เคยเช็คอินวันนี้ -> บันทึก check_in
       const insertResult = await pool.query(
         `INSERT INTO attendance (guest_id, check_in, attendance_date) VALUES ($1, NOW(), $2) RETURNING *`,
         [matchedGuest.id, todayDateString]
       );
       attendance = insertResult.rows[0];
 
-      // เช็คเวลาเข้างานสายไหม (เช็ค 8:30)
-      const checkInTime = new Date(attendance.check_in);
-      const lateThreshold = new Date(todayDateString + 'T08:30:00');
-      const isLate = checkInTime > lateThreshold;
+      const timestamp = new Date().toLocaleString();
+      const { isLate, otHours } = checkLateStatus(attendance.check_in, attendance.check_out);  // คำนวณ OT
+      sendAttendanceEmail(matchedGuest.email, 'check-in', timestamp, isLate);
 
       return res.json({
         message: 'เช็คอินเรียบร้อย',
         guest: matchedGuest,
         attendance,
-        isLate,
+        otHours, // ส่ง OT กลับไปด้วย
       });
     } else if (!attendance.check_out) {
-      // เคยเช็คอินวันนี้แล้วแต่ยังไม่เช็คเอาท์ -> บันทึก check_out
       const updateResult = await pool.query(
         `UPDATE attendance SET check_out = NOW() WHERE id = $1 RETURNING *`,
         [attendance.id]
       );
       attendance = updateResult.rows[0];
+
+      const timestamp = new Date().toLocaleString();
+      const { isLate, otHours } = checkLateStatus(attendance.check_in, attendance.check_out);  // คำนวณ OT
+      sendAttendanceEmail(matchedGuest.email, 'check-out', timestamp, isLate);
+
       return res.json({
         message: 'เช็คเอาท์เรียบร้อย',
         guest: matchedGuest,
         attendance,
+        otHours, // ส่ง OT กลับไปด้วย
       });
     } else {
-      // เช็คอินและเช็คเอาท์ครบแล้ววันนี้
       return res.status(400).json({ message: 'เช็คเอาท์วันนี้แล้ว ไม่สามารถลงเวลาเพิ่มได้' });
     }
   } catch (error) {
@@ -136,6 +200,7 @@ app.post('/attendance', async (req, res) => {
   }
 });
 
+// API อื่นๆ สำหรับดึงข้อมูลการเช็คอิน/เช็คเอาท์ และข้อมูลพนักงาน
 app.get('/attendance/all', async (req, res) => {
   try {
     const query = `
@@ -170,7 +235,7 @@ app.get('/attendance/list', async (req, res) => {
   }
 });
 
-// ดึงจำนวนพนักงานทั้งหมด
+// ฟังก์ชันการดึงจำนวนพนักงานทั้งหมด
 app.get('/guest/count', async (req, res) => {
   try {
     const result = await pool.query('SELECT COUNT(*) FROM guest');
@@ -315,6 +380,41 @@ app.get('/attendance/count/filter', async (req, res) => {
     res.status(500).json({ message: error.message });
   }
 });
+
+// API สำหรับการส่งอีเมลยืนยัน
+app.post('/send-verification-email', async (req, res) => {
+  try {
+    const { email } = req.body;
+
+    const verificationCode = '123456';  // รหัสยืนยันที่คุณสร้างขึ้น
+
+    // ส่งอีเมลยืนยัน
+    sendVerificationEmail(email, verificationCode);
+
+    res.json({ message: 'ส่งอีเมลยืนยันแล้ว' });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ message: error.message });
+  }
+});
+
+// ดึงข้อมูลการเช็คอิน
+app.get('/attendance/checkin-time', async (req, res) => {
+  try {
+    const result = await pool.query(`
+      SELECT EXTRACT(HOUR FROM check_in) AS time_slot, COUNT(*) AS count
+      FROM attendance
+      WHERE check_in IS NOT NULL
+      GROUP BY time_slot
+      ORDER BY time_slot
+    `);
+    res.json(result.rows);
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ message: error.message });
+  }
+});
+
 
 app.listen(port, () => {
   console.log(`Backend running on http://localhost:${port}`);
